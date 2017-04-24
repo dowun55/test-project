@@ -2,6 +2,7 @@ import boto3
 import datetime
 
 client = boto3.client('cloudwatch')
+
 startTime = datetime.datetime.utcnow() - datetime.timedelta(seconds=600)
 endTime = datetime.datetime.utcnow()
 
