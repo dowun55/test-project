@@ -22,4 +22,3 @@ response = client.get_metric_statistics(
 
 for printData in response['Datapoints']:
     print(str(printData['Timestamp']), printData['Maximum'])
-    
