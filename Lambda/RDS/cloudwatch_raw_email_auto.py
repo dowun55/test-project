@@ -43,6 +43,6 @@ def lambda_handler(event, context):
 
     response = sns.publish(
                 TopicArn = 'arn:aws:sns:ap-northeast-2:449635015751:CSY-SNS-TEST',
-                Subject = '[AWS알림] RDS seoul-csy-test 일일 리포트',
+                Subject = '[AWS알림] ' + startDay + ' RDS ' + dbName + '일일 리포트',
                 Message = message_body
             )
