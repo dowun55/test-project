@@ -1,9 +1,17 @@
 import boto3
 import datetime
+from datetime import date
+from datetime import timedelta
 
 client = boto3.client('cloudwatch')
-startTime = datetime.datetime.utcnow() - datetime.timedelta(seconds=600)
-endTime = datetime.datetime.utcnow()
+dbName = 'seoul-csy-test'
+startDay = date.today() - timedelta(1)
+startTime = datetime.time(00, 00, 00)
+startDate = datetime.datetime.combine(startDay, startTime)
+
+endDay = date.today()
+endTime = datetime.time(00, 00, 00)
+endDate = datetime.datetime.combine(endDay, endTime)
 
 response = client.get_metric_statistics(
     Namespace = 'AWS/RDS',
@@ -11,14 +19,21 @@ response = client.get_metric_statistics(
     Dimensions = [
         {
             'Name': 'DBInstanceIdentifier',
-            'Value': 'seoul-csy-test'
+            'Value': dbName
         },
     ],
-    StartTime = startTime,
-    EndTime = endTime,
-    Period = 60,
+    StartTime = startDate,
+    EndTime = endDate,
+    Period = 3600,
     Statistics = [ 'Maximum' ],
 )
 
+result = []
 for printData in response['Datapoints']:
-    print(str(printData['Timestamp']), printData['Maximum'])
+    result.append(print (str(printData['Timestamp']), printData['Maximum']))
+
+response = sns.publish(
+            TopicArn = 'arn:aws:sns:ap-northeast-2:449635015751:CSY-SNS-TEST',
+            Subject = '[AWS알림] RDS 일일 리포트',
+            Message = result
+        )
