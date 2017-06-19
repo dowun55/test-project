@@ -3,38 +3,21 @@ import paramiko
 
 def ssh_handler(event, context):
 
-    client = boto3.client('ec2')
-    s3_client = boto3.resource('s3')
-    s3 = boto3.resource('s3')
+    s3_client = boto3.client('s3')
+    s3_client.download_file('csy-key-bucket-test', 'keys/CSY-EC2-TEST.pem', '/tmp/CSY-EC2-TEST.pem')
 
-    #Download private key file from secure S3 bucket
-    s3.meta.client.download_file('csy-test-bucket','keys/CSY-EC2-TEST.pem', '/tmp/CSY-EC2-TEST.pem')
+    ssh_key = paramiko.RSAKey.from_private_key_file('/tmp/CSY-EC2-TEST.pem')
 
-    filters = [{'Name':'tag:Environment','Values':['Dev']}]
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect( hostname = '10.33.21.191', username = 'ubuntu', pkey = ssh_key )
 
-    instances = client.describe_instances(Filters=filters)
+    stdin, stdout, stderr = ssh_client.exec_command('ps aux | head -3')
 
-    k = paramiko.RSAKey.from_private_key_file("/tmp/CSY-EC2-TEST.pem")
-    c = paramiko.SSHClient()
-    c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    lines = stdout.read().splitlines()
+    for line in lines:
+       print(line)
 
-    hostList = []
+    print(stderr.read())
 
-    for host in instances['Reservations']:
-        for inst in host['Instances']:
-            hostList.append(inst['PrivateIpAddress'])
-
-    for host in hostList:
-        print ("Connecting to " + host)
-        c.connect( hostname = host, username = "ubuntu", pkey = k )
-        print ("Connected to " + host)
-        commands = [
-            "sudo netstat -anptu | grep pdns",
-            "sudo ps aux | grep pdns | grep -v grep",
-            "sudo tail -30 /var/log/syslog"
-            ]
-        for command in commands:
-            print ("Executing [$ {}]".format(command))
-            stdin , stdout, stderr = c.exec_command(command)
-            print ("".join(stdout.readlines()))
-            print ("".join(stderr.readlines()))
+    ssh_client.close()
