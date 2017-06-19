@@ -1,49 +1,3 @@
-'''
-Follow these steps to configure the webhook in Slack:
-
-  1. Navigate to https://<your-team-domain>.slack.com/services/new
-
-  2. Search for and select "Incoming WebHooks".
-
-  3. Choose the default channel where messages will be sent and click "Add Incoming WebHooks Integration".
-
-  4. Copy the webhook URL from the setup instructions and use it in the next section.
-
-To encrypt your secrets use the following steps:
-
-  1. Create or use an existing KMS Key - http://docs.aws.amazon.com/kms/latest/developerguide/create-keys.html
-
-  2. Click the "Enable Encryption Helpers" checkbox
-
-  3. Paste <SLACK_CHANNEL> into the slackChannel environment variable
-
-  Note: The Slack channel does not contain private info, so do NOT click encrypt
-
-  4. Paste <SLACK_HOOK_URL> into the kmsEncryptedHookUrl environment variable and click encrypt
-
-  Note: You must exclude the protocol from the URL (e.g. "hooks.slack.com/services/abc123").
-
-  5. Give your function's role permission for the kms:Decrypt action.
-
-     Example:
-
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "Stmt1443036478000",
-            "Effect": "Allow",
-            "Action": [
-                "kms:Decrypt"
-            ],
-            "Resource": [
-                "<your KMS key ARN>"
-            ]
-        }
-    ]
-}
-'''
-
 import boto3
 import json
 import logging
@@ -52,7 +6,6 @@ import os
 from base64 import b64decode
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
-
 
 # The base-64 encoded, encrypted key (CiphertextBlob) stored in the kmsEncryptedHookUrl environment variable
 ENCRYPTED_HOOK_URL = os.environ['kmsEncryptedHookUrl']
@@ -64,23 +17,35 @@ HOOK_URL = "https://" + boto3.client('kms').decrypt(CiphertextBlob=b64decode(ENC
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-
 def lambda_handler(event, context):
     logger.info("Event: " + str(event))
-    message = json.loads(event['Records'][0]['Sns']['Message'])
+    message = json.loads(json.dumps(event))
     logger.info("Message: " + str(message))
 
-    alarm_name = message['AlarmName']
+    alarm_name = message['detail-type']
     #old_state = message['OldStateValue']
-    new_state = message['NewStateValue']
-    reason = message['NewStateReason']
+    instance_ID = message['detail']['instance-id']
+    new_state = message['detail']['state']
+    changed_time = message['time']
+
+    client = boto3.client('ec2')
+
+    response = client.describe_instances(InstanceIds=[instance_ID])
+
+    for reservation in response['Reservations']:
+        for instance in reservation['Instances']:
+            for tag in instance['Tags']:
+                if(tag['Key'] == 'Name'):
+                    instance_Name = tag['Value']
 
     slack_message = {
         'channel': SLACK_CHANNEL,
-        'text': "%s state is now %s: %s" % (alarm_name, new_state, reason)
+        'username': "BESPIN AWS 알리미",
+        'icon_emoji': ":exclamation:",
+        'text': "[알림] %s\nInstanceId : %s (%s)\nState : %s\nTime : %s" % (alarm_name, instance_ID, instance_Name, new_state, changed_time)
     }
 
-    req = Request(HOOK_URL, json.dumps(slack_message))
+    req = Request(HOOK_URL, json.dumps(slack_message, ensure_ascii=False).encode('utf8'))
     try:
         response = urlopen(req)
         response.read()
