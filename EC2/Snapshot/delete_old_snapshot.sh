@@ -1,19 +1,18 @@
 #!/bin/bash
 
-OWNERID=321653183891
 REGIONS="ap-northeast-2"
-DATE=$(date +%Y%m%d)
+OWNERID=$(aws sts get-caller-identity --query Account --output text)
 DELETEDATE=$(date +%Y%m%d --date="1week ago")
 
 for REGION in $REGIONS; do
         aws ec2 describe-snapshots --region $REGION --owner-id $OWNERID --query 'Snapshots[*].[StartTime,SnapshotId]' --output text > snapshot-list
 
-        while read startTime snapshotId; do
-                convertTime=$(date -d $startTime +%Y%m%d)
-                if [ "$convertTime" -gt "$DELETEDATE" ]; then continue;
+        while read STARTTIME SNAPSHOTID; do
+                CONVERTTIME=$(date -d $STARTTIME +%Y%m%d)
+                if [ "$CONVERTTIME" -gt "$DELETEDATE" ]; then continue;
                 else
                         #명령줄 입력
-                        echo $convertTime
+                        aws ec2 delete-snapshot --snapshot-id $SNAPSHOTID
                 fi
         done < snapshot-list
 done
