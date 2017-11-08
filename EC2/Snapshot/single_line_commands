@@ -1,0 +1,3 @@
+
+#전체 리전별 인스턴스 리스트 조회
+REGIONS=$(aws ec2 describe-regions --query 'Regions[*].RegionName' --output text); for REGION in $REGIONS; do echo $REGION; aws ec2 describe-instances --region $REGION --query 'Reservations[*].Instances[*].[Tags[?Key==`Name`].Value | [0],State.Name,InstanceId]' --output table; echo ""; done
